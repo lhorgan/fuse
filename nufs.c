@@ -11,8 +11,8 @@
 #define FUSE_USE_VERSION 26
 #include <fuse.h>
 
-#include "storage.h"
-
+//#include "storage.h"
+#include "act.h"
 
 // implementation for: man 2 access
 // Checks if a file exists.
