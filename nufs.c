@@ -74,7 +74,8 @@ int
 nufs_mkdir(const char *path, mode_t mode)
 {
     printf("mkdir(%s)\n", path);
-    return -1;
+    return create_directory(path, mode);
+    //return -1;
 }
 
 int

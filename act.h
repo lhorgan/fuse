@@ -13,8 +13,6 @@ struct directory;
 typedef struct directory directory;
 struct inode;
 typedef struct inode inode;
-struct inode_table;
-typedef struct inode_table inode_table;
 
 struct file {
     char* data;
@@ -31,7 +29,7 @@ struct directory {
 
 struct inode {
     int refs; // reference count
-    int mode; // permission & type
+    mode_t mode; // permission & type
     int size; // bytes for file
     file* d_pages[12];
     inode* i_page;
@@ -49,4 +47,7 @@ void pages_init(const char* path);
 void pages_free();
 void* pages_get_page(int pnum);
 int pages_find_empty();
+int create_directory(const char* path, mode_t mode);
 inode* get_inode_from_path(const char* path);
+char* level_up(const char* path);
+char* get_leaf(const char* path);
