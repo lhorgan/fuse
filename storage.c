@@ -75,4 +75,3 @@ get_data(const char* path)
 
     return dat->data;
 }
-

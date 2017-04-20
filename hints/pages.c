@@ -51,7 +51,7 @@ pnode*
 pages_get_node(int node_id)
 {
     pnode* idx = (pnode*) pages_get_page(0);
-    return &(idx[pnum]);
+    return &(idx[node_id]);
 }
 
 int
@@ -78,5 +78,3 @@ print_node(pnode* node)
         printf("node{null}\n");
     }
 }
-
-

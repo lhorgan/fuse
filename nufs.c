@@ -20,7 +20,7 @@ int
 nufs_access(const char *path, int mask)
 {
     printf("access(%s, %04o)\n", path, mask);
-    return 0;
+    return 0; // this is fine for now
 }
 
 // implementation for: man 2 stat
@@ -62,7 +62,7 @@ nufs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 // mknod makes a filesystem object like a file or directory
 // called for: man 2 open, man 2 link
 int
-nufs_mknod(const char *path, mode_t mode, dev_t rdev)
+nufs_mknod(const char *path, mode_t mode, dev_t rdev) // huh?
 {
     printf("mknod(%s, %04o)\n", path, mode);
     return -1;
@@ -172,6 +172,7 @@ struct fuse_operations nufs_ops;
 int
 main(int argc, char *argv[])
 {
+    printf("Hello world\n");
     assert(argc > 2 && argc <= 5);
     storage_init(argv[--argc]);
     nufs_init_ops(&nufs_ops);
