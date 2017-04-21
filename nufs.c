@@ -44,7 +44,7 @@ int
 nufs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
              off_t offset, struct fuse_file_info *fi)
 {
-    struct stat st;
+    /*struct stat st;
 
     printf("readdir(%s)\n", path);
 
@@ -54,7 +54,7 @@ nufs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     filler(buf, ".", &st, 0);
 
     get_stat("/hello.txt", &st);
-    filler(buf, "hello.txt", &st, 0);
+    filler(buf, "hello.txt", &st, 0);*/
 
     return 0;
 }
