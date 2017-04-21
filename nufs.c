@@ -74,8 +74,8 @@ int
 nufs_mkdir(const char *path, mode_t mode)
 {
     printf("mkdir(%s)\n", path);
-    return create_directory(path, mode);
-    //return -1;
+    //return create_directory(path, mode);
+    return -1;
 }
 
 int
@@ -170,12 +170,12 @@ nufs_init_ops(struct fuse_operations* ops)
 
 struct fuse_operations nufs_ops;
 
-int
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
     printf("Hello world\n");
     assert(argc > 2 && argc <= 5);
     storage_init(argv[--argc]);
     nufs_init_ops(&nufs_ops);
+    printf("I am not dead here.\n");
     return fuse_main(argc, argv, &nufs_ops, NULL);
 }

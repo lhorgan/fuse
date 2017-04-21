@@ -13,9 +13,12 @@
 #include <stdlib.h>
 
 static int   pages_fd   = -1;
+
 static void* pages_base =  0;
-inode** inode_table = 0;
-int* page_table = 0;
+inode* inode_table = 0;
+
+int* inode_bitmap = 0;
+int* page_bitmap = 0;
 
 void storage_init(const char* path)
 {
@@ -25,6 +28,7 @@ void storage_init(const char* path)
 
 int get_stat(const char* path, struct stat* st)
 {
+    printf("getting stat for %s", path);
     inode* node = get_inode_from_path(path);
     if(!node) {
         printf("can't get file data from this path");
@@ -46,6 +50,7 @@ const char* get_data(const char* path)
     }
 
     return dat->data;*/
+    printf("HIYA getting file data\n");
     return "hello";
 }
 
@@ -63,16 +68,29 @@ void pages_init(const char* path)
     assert(pages_base != MAP_FAILED);
 
     // this should really only happen the first time
-    page_table = (int*)pages_get_page(0);
-    page_table[0] = 0; // first page stores the page table itself (so meta)
-    page_table[1] = 0; // second page stores the inode table
-    for(int i = 2; i < 256; i++) { // remaining pages are free
-        page_table[i] = 1;
+    // page bitmap
+    page_bitmap = (int*)pages_get_page(0);
+    page_bitmap[0] = 0; // first page stores the page bitmap
+    page_bitmap[1] = 0; // second page stores the inode bitmap
+    page_bitmap[2] = 0; // inodes themselves
+    page_bitmap[3] = 0; // root directory structure
+    for(int i = 4; i < 256; i++) { // remaining pages are free
+        page_bitmap[i] = 1;
     }
-    inode_table = (inode**)pages_get_page(1);
+
+    // inode bitmap
+    inode_bitmap = (int*)pages_get_page(1);
     for(int i = 0; i < 256; i++) {
-        inode_table[i] = 0;
+        inode_bitmap[i] = 1;
     }
+
+    inode_table = (inode*)pages_get_page(2);
+
+    inode_table[0].size = 0;
+    inode_table[0].mode = 040755;
+    directory* root_dir = (directory*)(pages_get_page(2));
+    inode_table[0].dir = root_dir;
+    inode_bitmap[0] = 0; // the 0th inode is taken
     printf("success!");
 }
 
@@ -91,7 +109,7 @@ int pages_find_empty()
 {
     int pnum = -1;
     for(int ii = 2; ii < PAGE_COUNT; ++ii) {
-        if(page_table[ii]) { // 1 free, 0 not free
+        if(page_bitmap[ii]) { // 1 free, 0 not free
             pnum = ii;
             break;
         }
@@ -101,14 +119,15 @@ int pages_find_empty()
 
 inode* get_free_inode() {
     for(int i = 0; i < 256; i++) {
-        if(inode_table[i] == 0) {
-            return inode_table[i];
+        if(inode_bitmap[i] == 1) { // free
+            return &inode_table[i];
         }
     }
     return 0;
 }
 
 int create_directory(const char* path, mode_t mode) {
+    printf("CREATING DIRECTORY %s", path);
     char* parent_path = level_up(path);
     char* leaf = get_leaf(path);
 
@@ -124,7 +143,7 @@ int create_directory(const char* path, mode_t mode) {
                     if(page_idx >= 0) { // we found a page for  our directory
                         printf("directory created!");
                         directory* leaf_dir = (directory*)pages_get_page(page_idx);
-                        page_table[page_idx] = 0; // this page is no longer free
+                        page_bitmap[page_idx] = 0; // this page is no longer free
                         leaf_dir_inode->dir = leaf_dir;
                         leaf_dir_inode->size = 0;
                         leaf_dir_inode->mode = mode;
@@ -174,9 +193,13 @@ char* get_leaf(const char* path) {
 }
 
 inode* get_inode_from_path(const char* path) {
+    printf("Getting inode from path: %s\n", path);
     slist* split = s_split(path, '/'); // split path on /
-    inode* curr_node = inode_table[0]; // start at the root directory
-    while(split) {
+    inode* curr_node = &inode_table[0]; // start at the root directory
+    printf("INITIAL NODE IS %i\n", curr_node);
+    printf("%s\n", split->data);
+    while(split && strlen(split->data) > 0) {
+        printf("split, len: %s %i\n", split->data, strlen(split->data));
         if(curr_node->dir) { // this node points to a directory
             int entry_found = 0;
             for(int i = 0; i < PAGE_COUNT; i++) { // loop through all the entries in the directory pointed to by this inode
@@ -198,5 +221,6 @@ inode* get_inode_from_path(const char* path) {
         }
         split = split->next;
     }
+    printf("CURR NODE IS NOW: %i\n", curr_node);
     return curr_node;
 }
