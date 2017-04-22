@@ -24,11 +24,12 @@ struct directory_entry {
 };
 
 struct directory {
-    directory_entry entries[PAGE_COUNT]; // can't possibly have more 4k entries than this
+    directory_entry* entries; // can't possibly have more 4k entries than this
 };
 
 struct inode {
     int refs; // reference count
+    int message;
     mode_t mode; // permission & type
     int size; // bytes for file
     file* d_pages[12];

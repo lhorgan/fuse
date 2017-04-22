@@ -12,6 +12,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#define DIRSIZE 20
+
 static int   pages_fd   = -1;
 
 static void* pages_base =  0;
@@ -58,6 +60,11 @@ void pages_init(const char* path)
 {
     printf("INITIALIZING!\n\n");
     printf("%s\n", path);
+    int exists = 0;
+    if(access(path, F_OK) != -1) {
+        exists = 1;
+    }
+
     pages_fd = open(path, O_CREAT | O_RDWR, 0644);
     assert(pages_fd != -1);
 
@@ -69,29 +76,47 @@ void pages_init(const char* path)
 
     // this should really only happen the first time
     // page bitmap
-    page_bitmap = (int*)pages_get_page(0);
-    page_bitmap[0] = 0; // first page stores the page bitmap
-    page_bitmap[1] = 0; // second page stores the inode bitmap
-    page_bitmap[2] = 0; // inodes themselves
-    page_bitmap[3] = 0; // root directory structure
-    for(int i = 4; i < 256; i++) { // remaining pages are free
-        page_bitmap[i] = 1;
+    if(!exists) {
+        printf("creating!\n");
+        page_bitmap = (int*)pages_get_page(0);
+        page_bitmap[0] = 0; // first page stores the page bitmap
+        page_bitmap[1] = 0; // second page stores the inode bitmap
+        page_bitmap[2] = 0; // inodes themselves
+        page_bitmap[3] = 0; // root directory structure
+        for(int i = 4; i < 256; i++) { // remaining pages are free
+            page_bitmap[i] = 1;
+        }
+
+        // inode bitmap
+        inode_bitmap = (int*)pages_get_page(1);
+        for(int i = 0; i < 256; i++) {
+            inode_bitmap[i] = 1;
+        }
+
+        inode_table = (inode*)pages_get_page(2);
+
+        inode_table[0].size = 0;
+        inode_table[0].message = 513;
+        inode_table[0].mode = 040755;
+        directory* root_dir = (directory*)(pages_get_page(3));
+        root_dir->entries = (directory_entry*)(sizeof(root_dir) + pages_get_page(3));
+        printf("useful info %i\n, %i\n", root_dir, root_dir->entries);
+        inode_table[0].dir = root_dir;
+        inode_bitmap[0] = 0; // the 0th inode is taken
+        printf("success!\n");
+        printf("address of inode_table[0]: %i\n", inode_table[0].dir);
+        printf("address of page 3: %i\n", pages_get_page(3));
+        printf("address of root dir: %i\n", root_dir);
     }
-
-    // inode bitmap
-    inode_bitmap = (int*)pages_get_page(1);
-    for(int i = 0; i < 256; i++) {
-        inode_bitmap[i] = 1;
+    else {
+        printf("No need to create!\n");
+        page_bitmap = (int*)pages_get_page(0);
+        inode_bitmap = (int*)pages_get_page(1);
+        inode_table = (inode*)pages_get_page(2);
+        printf("address of inode_table[0]: %i\n", inode_table[0].dir);
+        printf("inode table message: %i\n", inode_table[0].message);
+        printf("address of page 3: %i\n", pages_get_page(3));
     }
-
-    inode_table = (inode*)pages_get_page(2);
-
-    inode_table[0].size = 0;
-    inode_table[0].mode = 040755;
-    directory* root_dir = (directory*)(pages_get_page(2));
-    inode_table[0].dir = root_dir;
-    inode_bitmap[0] = 0; // the 0th inode is taken
-    printf("success!\n");
 }
 
 void pages_free()
@@ -135,7 +160,7 @@ int create_directory(const char* path, mode_t mode) {
     inode* parent_dir_inode = get_inode_from_path(parent_path); // inode pointing to the parent directory
     if(parent_dir_inode->dir) { // parent directory is in fact a directory
         directory* parent_dir = parent_dir_inode->dir;
-        for(int i = 0; i < PAGE_COUNT; i++) {
+        for(int i = 0; i < DIRSIZE; i++) {
             if(!parent_dir->entries[i].node) { // empty slot!
                 int inode_idx = inode_get_empty();
                 inode* leaf_dir_inode = &inode_table[inode_idx];//get_free_inode();
@@ -146,6 +171,7 @@ int create_directory(const char* path, mode_t mode) {
                         inode_bitmap[inode_idx] = 0; // no longer free
                         directory* leaf_dir = (directory*)pages_get_page(page_idx);
                         page_bitmap[page_idx] = 0; // this page is no longer free
+                        leaf_dir->entries = (directory_entry*)(sizeof(leaf_dir) +pages_get_page(page_idx));
                         leaf_dir_inode->dir = leaf_dir;
                         leaf_dir_inode->size = 0;
                         leaf_dir_inode->mode = 040755;
@@ -215,16 +241,17 @@ inode* get_inode_from_path(const char* path) {
         printf("split, len: %s %i\n", split->data, strlen(split->data));
         if(curr_node->dir) { // this node points to a directory
             int entry_found = 0;
-            for(int i = 0; i < PAGE_COUNT; i++) { // loop through all the entries in the directory pointed to by this inode
-                directory_entry entry = curr_node->dir->entries[i]; // little unclear dir->entries shouldn't be dir.entries, but whatever
-                if(strlen(entry.name) > 0) {
-                    printf("ENTRY NAME: %s\n", entry.name);
+            for(int i = 0; i < DIRSIZE; i++) { // loop through all the entries in the directory pointed to by this inode
+                printf("%i --> %i (%i)\n", curr_node->dir, &curr_node->dir->entries, i);
+                directory_entry* entries = curr_node->dir->entries; // little unclear dir->entries shouldn't be dir.entries, but whatever
+                if(strlen(entries[i].name) > 0) {
+                    printf("ENTRY NAME: %s\n", entries[i].name);
                 }
-                if(/*entry.node && */strcmp(entry.name, split->data) == 0) { // current entry points to the inode for our path
-                    printf("entry.name is %s\n", entry.name);
+                if(/*entry.node && */strcmp(entries[i].name, split->data) == 0) { // current entry points to the inode for our path
+                    printf("entry.name is %s\n", entries[i].name);
                     //printf("node for path %s found\n", path);
                     printf("curr node has gone from %i.... ", curr_node);
-                    curr_node = entry.node;
+                    curr_node = entries[i].node;
                     printf(" ....to %i\n", curr_node);
                     entry_found = 1;
                 }
