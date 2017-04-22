@@ -20,21 +20,19 @@ struct file {
 
 struct directory_entry {
     char name[48];
-    inode* node;
+    int inode_pnum;
 };
 
-struct directory {
+/*struct directory {
     directory_entry* entries; // can't possibly have more 4k entries than this
-};
+};*/
 
 struct inode {
     int refs; // reference count
     int message;
     mode_t mode; // permission & type
     int size; // bytes for file
-    file* d_pages[12];
-    inode* i_page;
-    directory* dir;
+    int dir_pnum;
 };
 
 // struct inode_table {
@@ -52,3 +50,6 @@ int create_directory(const char* path, mode_t mode);
 inode* get_inode_from_path(const char* path);
 char* level_up(const char* path);
 char* get_leaf(const char* path);
+directory_entry* get_directory(int pnum);
+inode* get_inode(int pnum);
+int initialize_directory(int pnum);
