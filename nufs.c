@@ -65,7 +65,8 @@ int
 nufs_mknod(const char *path, mode_t mode, dev_t rdev) // huh?
 {
     printf("mknod(%s, %04o)\n", path, mode);
-    return -1;
+    return create_file(path, mode);
+    //return -1;
 }
 
 // most of the following callbacks implement

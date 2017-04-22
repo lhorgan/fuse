@@ -33,6 +33,7 @@ struct inode {
     mode_t mode; // permission & type
     int size; // bytes for file
     int dir_pnum;
+    int data_pnum; // block filled with pointers to file data
 };
 
 // struct inode_table {
@@ -47,9 +48,14 @@ void pages_free();
 void* pages_get_page(int pnum);
 int pages_find_empty();
 int create_directory(const char* path, mode_t mode);
+int create_file(const char* path, mode_t mode);
 inode* get_inode_from_path(const char* path);
 char* level_up(const char* path);
 char* get_leaf(const char* path);
 directory_entry* get_directory(int pnum);
 inode* get_inode(int pnum);
 int initialize_directory(int pnum);
+int initialize_file(int pnum);
+int write_file(const char* path, const char* buf, size_t size, off_t offset);
+int min(int num1, int num2);
+int initialize_file_page_table(int pnum);

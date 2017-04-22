@@ -13,6 +13,7 @@
 #include <stdlib.h>
 
 #define DIRSIZE 20
+#define FPTLEN 40
 
 static int   pages_fd   = -1;
 
@@ -33,10 +34,11 @@ int get_stat(const char* path, struct stat* st)
     printf("getting stat for %s\n", path);
     inode* node = get_inode_from_path(path);
     if(!node) {
-        printf("can't get file data from this path\n");
+        printf("can't get stat metadata from this path\n");
         return -1;
     }
 
+    printf("got file data");
     memset(st, 0, sizeof(struct stat));
     st->st_uid = getuid();
     st->st_mode = node->mode;
@@ -159,7 +161,7 @@ int create_directory(const char* path, mode_t mode) {
     if(parent_inode && parent_inode->dir_pnum >= 0) {
         directory_entry* parent_dir = get_directory(parent_inode->dir_pnum);
         for(int i = 0; i < DIRSIZE; i++) {
-            if(parent_dir[i].inode_pnum < 0) { // free directory
+            if(parent_dir[i].inode_pnum < 0) { // free entry
                 strcpy(parent_dir[i].name, get_leaf(path));
 
                 int inode_pnum = inode_get_empty();
@@ -170,6 +172,7 @@ int create_directory(const char* path, mode_t mode) {
                 initialize_directory(new_dir_pnum);
                 inode* new_dir_inode = get_inode(inode_pnum);
                 new_dir_inode->dir_pnum = new_dir_pnum;
+                new_dir_inode->data_pnum = -1;
                 new_dir_inode->size = 0;
                 new_dir_inode->mode = 040755;
 
@@ -178,10 +181,6 @@ int create_directory(const char* path, mode_t mode) {
         }
     }
     return -1; // error
-}
-
-int create_file(const char* path, mode_t mode) {
-    
 }
 
 // just create an empty directory on a page
@@ -193,6 +192,98 @@ int initialize_directory(int pnum) {
         entries[i].inode_pnum = -1;
     }
 }
+
+int create_file(const char* path, mode_t mode) {
+    char* parent_path = level_up(path);
+    printf("parent path: %s\n", parent_path);
+    inode* parent_inode = get_inode_from_path(parent_path);
+    printf("%i\n", parent_inode);
+    if(parent_inode && parent_inode->dir_pnum >= 0) {
+        directory_entry* parent_dir = get_directory(parent_inode->dir_pnum);
+        for(int i = 0; i < DIRSIZE; i++) {
+            if(parent_dir[i].inode_pnum < 0) { // free entry
+                strcpy(parent_dir[i].name, get_leaf(path));
+
+                int inode_pnum = inode_get_empty();
+                inode_bitmap[inode_pnum] = 0;
+                parent_dir[i].inode_pnum = inode_pnum; // TODO, CHECK IF INODE IS ACTUALLY FREE
+
+                int new_file_pnum = pages_find_empty();
+                //page_bitmap[new_file_pnum] = 0; // this page is now taken with a data block
+                initialize_file_page_table(new_file_pnum);
+                inode* new_file_inode = get_inode(inode_pnum);
+                new_file_inode->data_pnum = new_file_pnum;
+                new_file_inode->dir_pnum = -1; // not a directory
+                new_file_inode->size = 0;
+                new_file_inode->mode = 0100777;
+
+                return 0;
+            }
+        }
+    }
+    return -1; // error
+}
+
+int initialize_file_page_table(int pnum) {
+    page_bitmap[pnum] = 0;
+    int* pnums = (int*)pages_get_page(pnum);
+    for(int i = 0; i < FPTLEN; i++) {
+        pnums[i] = -1;
+    }
+}
+
+int write_file(const char* path, const char* buf, size_t size, off_t offset) {
+    inode* file_inode = get_inode_from_path(path);
+    if(file_inode && file_inode->data_pnum >= 0) {
+        file_inode->size += size;
+        int* page_nums = (int*)pages_get_page(file_inode->data_pnum);
+        int page_nums_index = offset / 4096;
+        int data_remaining = size;
+        int off_in_page = offset - (4096 * page_nums_index);
+
+        data_remaining = size;
+        while(data_remaining) {
+            int page_num = page_nums[page_nums_index];
+            if(page_num < 0) { // this page isn't pointing to anything yet
+                page_num = pages_find_empty(); // TODO: HANDLE PAGE NOT BEING FREE
+                page_bitmap[page_num] = 0; // this page is taken now
+                page_nums[page_nums_index] = page_num;
+            }
+            char* data = (char*)(pages_get_page(page_num) + off_in_page);
+            strncpy(data, buf, min(data_remaining, 4096 - off_in_page));
+            if(off_in_page + data_remaining > 4096) {
+                //printf("writing starts at %i and I have %i characters to write\n", off_in_page, data_remaining);
+                data_remaining -= 4096 - off_in_page;
+                buf += 4096 - off_in_page;
+                off_in_page = 0;
+            }
+            else {
+                data_remaining -= data_remaining;
+            }
+            page_num++;
+        }
+        return 0; // success
+    }
+
+    return -1; // error
+}
+
+int min(int num1, int num2) {
+    if(num2 < num1) {
+        return num2;
+    }
+    return num1;
+}
+
+// actually initializing a file BLOCK, not the file itself
+// int initialize_file(int pnum) {
+//     page_bitmap[pnum] = 0;
+//     directory_entry* entries = (directory_entry*)pages_get_page(pnum);
+//     for(int i = 0; i < DIRSIZE; i++) {
+//         strcpy(entries[i].name, "\0");
+//         entries[i].inode_pnum = -1;
+//     }
+// }
 
 char* level_up(const char* path) {
     int last_slash_index = 0;
@@ -236,7 +327,7 @@ inode* get_inode_from_path(const char* path) {
             int entry_found = 0;
             for(int i = 0; i < DIRSIZE; i++) { // loop through all the entries in the directory pointed to by this inode
                 if(strcmp(dir[i].name, split->data) == 0) { // current entry points to the inode for our path
-                    printf("entry found\n");
+                    printf("entry found: %s\n", dir[i].name);
                     entry_found = 1;
                     curr_node = get_inode(dir[i].inode_pnum);
                 }
@@ -247,7 +338,7 @@ inode* get_inode_from_path(const char* path) {
             }
         }
         else { // can't search inside something that's not a directory
-            printf("you're trying to search inside something that's not a directory\n");
+            printf("you're trying to search inside something that's not a directory");
             return 0;
         }
         split = split->next;
