@@ -20,7 +20,7 @@ struct file {
 
 struct directory_entry {
     char name[48];
-    int inode_pnum;
+    int inode_idx;
 };
 
 /*struct directory {
@@ -53,9 +53,9 @@ inode* get_inode_from_path(const char* path);
 char* level_up(const char* path);
 char* get_leaf(const char* path);
 directory_entry* get_directory(int pnum);
-inode* get_inode(int pnum);
+inode* get_inode(int idx);
 int initialize_directory(int pnum);
 int initialize_file(int pnum);
 int write_file(const char* path, const char* buf, size_t size, off_t offset);
 int min(int num1, int num2);
-int initialize_file_page_table(int pnum);
+void initialize_file_page_table(int pnum);

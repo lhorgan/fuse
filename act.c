@@ -25,20 +25,20 @@ int* page_bitmap = 0;
 
 void storage_init(const char* path)
 {
-    //printf("TODO: Store file system data in: %s\n", path);
+    ////printf("TODO: Store file system data in: %s\n", path);
     pages_init(path); // create file for file system data
 }
 
 int get_stat(const char* path, struct stat* st)
 {
-    printf("getting stat for %s\n", path);
+    //printf("getting stat for %s\n", path);
     inode* node = get_inode_from_path(path);
     if(!node) {
-        printf("can't get stat metadata from this path\n");
+        //printf("can't get stat metadata from this path\n");
         return -1;
     }
 
-    printf("got file data");
+    //printf("got file data");
     memset(st, 0, sizeof(struct stat));
     st->st_uid = getuid();
     st->st_mode = node->mode;
@@ -54,14 +54,14 @@ const char* get_data(const char* path)
     }
 
     return dat->data;*/
-    printf("HIYA getting file data\n");
+    //printf("HIYA getting file data\n");
     return "hello";
 }
 
 void pages_init(const char* path)
 {
-    printf("INITIALIZING!\n\n");
-    printf("%s\n", path);
+    //printf("INITIALIZING!\n\n");
+    //printf("%s\n", path);
     int exists = 0;
     if(access(path, F_OK) != -1) {
         exists = 1;
@@ -127,8 +127,8 @@ directory_entry* get_directory(int pnum) {
     return (directory_entry*)pages_get_page(pnum);
 }
 
-inode* get_inode(int pnum) {
-    return (inode*)pages_get_page(pnum);
+inode* get_inode(int idx) {
+    return &inode_table[idx];
 }
 
 int pages_find_empty()
@@ -136,7 +136,7 @@ int pages_find_empty()
     int pnum = -1;
     for(int ii = 2; ii < PAGE_COUNT; ++ii) {
         if(page_bitmap[ii]) { // 1 free, 0 not free
-            printf("FREE PAGE: %i\n", ii);
+            //printf("FREE PAGE: %i\n", ii);
             pnum = ii;
             break;
         }
@@ -155,23 +155,26 @@ int inode_get_empty() {
 
 int create_directory(const char* path, mode_t mode) {
     char* parent_path = level_up(path);
-    printf("parent path: %s\n", parent_path);
+    //printf("parent path: %s\n", parent_path);
     inode* parent_inode = get_inode_from_path(parent_path);
-    printf("%i\n", parent_inode);
+    //printf("%i\n", parent_inode);
     if(parent_inode && parent_inode->dir_pnum >= 0) {
         directory_entry* parent_dir = get_directory(parent_inode->dir_pnum);
+        //printf("parent_inode->dir_pnum %i\n", parent_inode->dir_pnum);
+        //printf("get_directory(parent_inode->dir_pnum): %i\n", parent_dir);
         for(int i = 0; i < DIRSIZE; i++) {
-            if(parent_dir[i].inode_pnum < 0) { // free entry
+            if(parent_dir[i].inode_idx < 0) { // free entry
                 strcpy(parent_dir[i].name, get_leaf(path));
 
-                int inode_pnum = inode_get_empty();
-                inode_bitmap[inode_pnum] = 0;
-                parent_dir[i].inode_pnum = inode_pnum; // TODO, CHECK IF INODE IS ACTUALLY FREE
+                int inode_idx = inode_get_empty();
+                inode_bitmap[inode_idx] = 0;
+                parent_dir[i].inode_idx = inode_idx; // TODO, CHECK IF INODE IS ACTUALLY FREE
 
                 int new_dir_pnum = pages_find_empty();
                 initialize_directory(new_dir_pnum);
-                inode* new_dir_inode = get_inode(inode_pnum);
+                inode* new_dir_inode = get_inode(inode_idx);
                 new_dir_inode->dir_pnum = new_dir_pnum;
+                printf("dir pnum exists at %i\n", pages_get_page(new_dir_pnum));
                 new_dir_inode->data_pnum = -1;
                 new_dir_inode->size = 0;
                 new_dir_inode->mode = 040755;
@@ -185,34 +188,38 @@ int create_directory(const char* path, mode_t mode) {
 
 // just create an empty directory on a page
 int initialize_directory(int pnum) {
+    //printf("taking %i for use as a directory\n", pnum);
     page_bitmap[pnum] = 0;
     directory_entry* entries = (directory_entry*)pages_get_page(pnum);
     for(int i = 0; i < DIRSIZE; i++) {
         strcpy(entries[i].name, "\0");
-        entries[i].inode_pnum = -1;
+        entries[i].inode_idx = -1;
     }
 }
 
 int create_file(const char* path, mode_t mode) {
     char* parent_path = level_up(path);
-    printf("parent path: %s\n", parent_path);
+    //printf("parent path: %s\n", parent_path);
     inode* parent_inode = get_inode_from_path(parent_path);
-    printf("%i\n", parent_inode);
+    //printf("%i\n", parent_inode);
     if(parent_inode && parent_inode->dir_pnum >= 0) {
         directory_entry* parent_dir = get_directory(parent_inode->dir_pnum);
+        //printf("file parent_inode->dir_pnum %i\n", parent_inode->dir_pnum);
+        //printf("file get_directory(parent_inode->dir_pnum): %i\n", parent_dir);
         for(int i = 0; i < DIRSIZE; i++) {
-            if(parent_dir[i].inode_pnum < 0) { // free entry
+            if(parent_dir[i].inode_idx < 0) { // free entry
+                //printf("by the way, i is %i\n", i);
+                //printf("THE PRESENT NAME OF THE ENTRY IS %s\n", parent_dir[i].name);
+                //printf("THE PRESENT NAME OF THE ENTRY IS %s\n", parent_dir[i - 1].name);
                 strcpy(parent_dir[i].name, get_leaf(path));
+                int new_file_inode_idx = inode_get_empty();
+                inode_bitmap[new_file_inode_idx] = 0; // taken
+                parent_dir[i].inode_idx = new_file_inode_idx;
+                inode* new_file_inode = get_inode(new_file_inode_idx);
 
-                int inode_pnum = inode_get_empty();
-                inode_bitmap[inode_pnum] = 0;
-                parent_dir[i].inode_pnum = inode_pnum; // TODO, CHECK IF INODE IS ACTUALLY FREE
-
-                int new_file_pnum = pages_find_empty();
-                //page_bitmap[new_file_pnum] = 0; // this page is now taken with a data block
-                initialize_file_page_table(new_file_pnum);
-                inode* new_file_inode = get_inode(inode_pnum);
-                new_file_inode->data_pnum = new_file_pnum;
+                int data_pnum = pages_find_empty();
+                initialize_file_page_table(data_pnum);
+                new_file_inode->data_pnum = data_pnum;
                 new_file_inode->dir_pnum = -1; // not a directory
                 new_file_inode->size = 0;
                 new_file_inode->mode = 0100777;
@@ -224,11 +231,15 @@ int create_file(const char* path, mode_t mode) {
     return -1; // error
 }
 
-int initialize_file_page_table(int pnum) {
+void initialize_file_page_table(int pnum) {
+    //printf("taking %i for use as a fpt\n", pnum);
     page_bitmap[pnum] = 0;
     int* pnums = (int*)pages_get_page(pnum);
+    ////printf("%i\n", pages_base);
     for(int i = 0; i < FPTLEN; i++) {
+        //printf("writing -1 to address %i\n", &pnums[i]);
         pnums[i] = -1;
+        //printf("%i\n", &pnums[i]);
     }
 }
 
@@ -252,7 +263,7 @@ int write_file(const char* path, const char* buf, size_t size, off_t offset) {
             char* data = (char*)(pages_get_page(page_num) + off_in_page);
             strncpy(data, buf, min(data_remaining, 4096 - off_in_page));
             if(off_in_page + data_remaining > 4096) {
-                //printf("writing starts at %i and I have %i characters to write\n", off_in_page, data_remaining);
+                ////printf("writing starts at %i and I have %i characters to write\n", off_in_page, data_remaining);
                 data_remaining -= 4096 - off_in_page;
                 buf += 4096 - off_in_page;
                 off_in_page = 0;
@@ -281,7 +292,7 @@ int min(int num1, int num2) {
 //     directory_entry* entries = (directory_entry*)pages_get_page(pnum);
 //     for(int i = 0; i < DIRSIZE; i++) {
 //         strcpy(entries[i].name, "\0");
-//         entries[i].inode_pnum = -1;
+//         entries[i].inode_idx = -1;
 //     }
 // }
 
@@ -304,7 +315,7 @@ char* level_up(const char* path) {
             parent_path[i] = path[i];
         }
         parent_path[last_slash_index] = 0;
-        printf("parent of %s is %s\n", path, parent_path);
+        //printf("parent of %s is %s\n", path, parent_path);
         return parent_path;
     }
 }
@@ -326,10 +337,14 @@ inode* get_inode_from_path(const char* path) {
             directory_entry* dir = get_directory(curr_node->dir_pnum);
             int entry_found = 0;
             for(int i = 0; i < DIRSIZE; i++) { // loop through all the entries in the directory pointed to by this inode
+                if(dir[i].inode_idx != -1)
+                    printf("ENTRY: %s, %i\n", dir[i].name, dir[i].inode_idx);
                 if(strcmp(dir[i].name, split->data) == 0) { // current entry points to the inode for our path
-                    printf("entry found: %s\n", dir[i].name);
+                    //printf("entry found: %s\n", dir[i].name);
                     entry_found = 1;
-                    curr_node = get_inode(dir[i].inode_pnum);
+                    curr_node = get_inode(dir[i].inode_idx);
+                    //printf("the new current node has directory type: %i\n", curr_node->dir_pnum);
+                    break;
                 }
             }
             if(!entry_found) {
@@ -338,7 +353,8 @@ inode* get_inode_from_path(const char* path) {
             }
         }
         else { // can't search inside something that's not a directory
-            printf("you're trying to search inside something that's not a directory");
+            //printf("boom %i bam %i\n", curr_node->dir_pnum, curr_node->data_pnum);
+            printf("you're trying to search inside something that's not a directory\n");
             return 0;
         }
         split = split->next;
