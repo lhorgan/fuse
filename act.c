@@ -70,6 +70,85 @@ int get_stat(const char* path, struct stat* st)
 //     return "hello";
 // }
 
+/*int rename(const char *from, const char *to) {
+    inode* from_inode = get_inode_from_path(from_inode);
+    if(from_inode) {
+        char* to_parent_path = level_up(to);
+        inode* to_parent_inode =
+    }
+}*/
+
+int unlink(const char *path) {
+    inode* uinode = get_inode_from_path(path);
+    if(uinode) {
+        if(uinode->data_pnum >= 0) {
+            uinode->refs -= 1;
+            inode* parent_inode = get_inode_from_path(level_up(path));
+            if(parent_inode->dir_pnum >= 0)
+            {
+                int inode_idx = -1;
+                printf("parent inode really is a directory\n");
+                char* to_unlink = get_leaf(path);
+                directory_entry* parent_dir = get_directory(parent_inode->dir_pnum);
+                for(int i = 0; i < DIRSIZE; i++) {
+                    if(strcmp(parent_dir[i].name, to_unlink) == 0) {
+                        printf("file identified, removed from list\n");
+                        strcpy(parent_dir[i].name, "\0");
+                        inode_idx = parent_dir[i].inode_idx;
+                        parent_dir[i].inode_idx = -1;
+                        break;
+                    }
+                }
+                if(inode_idx < 0) {
+                    printf("file not found in parent directory for deletion\n");
+                    return -1;
+                }
+                if(uinode->refs == 0) {
+                    printf("no links to file remain, deleting\n");
+                    if(uinode->dir_pnum >= 0) {
+                        printf("freeing associated directory data\n");
+                        //page_bitmap[inode->dir_pnum] = 1;
+                        release_page(uinode->dir_pnum);
+                    }
+                    if(uinode->data_pnum >= 0) {
+                        printf("freeing associated file data\n");
+                        int* file_pnums = (int*)pages_get_page(uinode->data_pnum);
+                        for(int x = 0; x < FPTLEN; x++) {
+                            if(file_pnums[x] >= 0) {
+                                release_page(file_pnums[x]);
+                            }
+                        }
+                        release_page(uinode->data_pnum);
+                    }
+                    release_inode(inode_idx);
+                }
+                return 0;
+            }
+        }
+        else {
+            printf("Directories cannot yet be deleted.  Sorry.");
+        }
+    }
+
+    return -1;
+}
+
+void release_inode(int inode_idx) {
+    inode_bitmap[inode_idx] = 1;
+    inode* node = get_inode(inode_idx);
+    node->refs = -1;
+    node->mode = 0;
+    node->size = -1;
+    node->dir_pnum = -1;
+    node->data_pnum = -1;
+}
+
+void release_page(int pnum) {
+    printf("releasing page %i\n", pnum);
+    page_bitmap[pnum] = 1; // page is now free
+    memset(pages_get_page(pnum), 0, 4096);
+}
+
 int get_data(const char* path, size_t size, off_t offset, char* res) {
     inode* file_inode = get_inode_from_path(path);
     printf("reading data from file!\n");
@@ -225,6 +304,7 @@ int create_directory(const char* path, mode_t mode) {
                 new_dir_inode->dir_pnum = new_dir_pnum;
                 printf("dir pnum exists at %i\n", pages_get_page(new_dir_pnum));
                 new_dir_inode->data_pnum = -1;
+                new_dir_inode->refs = 1;
                 new_dir_inode->size = 0;
                 new_dir_inode->mode = 040755;
 
@@ -269,6 +349,7 @@ int create_file(const char* path, mode_t mode) {
                 int data_pnum = pages_find_empty();
                 initialize_file_page_table(data_pnum);
                 new_file_inode->data_pnum = data_pnum;
+                new_file_inode->refs = 1;
                 new_file_inode->dir_pnum = -1; // not a directory
                 new_file_inode->size = 0;
                 new_file_inode->mode = 0100777;

@@ -84,8 +84,9 @@ nufs_mkdir(const char *path, mode_t mode)
 int
 nufs_unlink(const char *path)
 {
-    printf("unlink(%s)\n", path);
-    return -1;
+    return unlink(path);
+    //printf("unlink(%s)\n", path);
+    //return -1;
 }
 
 int

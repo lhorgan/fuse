@@ -60,3 +60,7 @@ int write_file(const char* path, const char* buf, size_t size, off_t offset);
 int min(int num1, int num2);
 void initialize_file_page_table(int pnum);
 int truncate(const char* path, off_t size);
+//int rename(const char *from, const char *to);
+int unlink(const char *path);
+void release_page(int pnum);
+void release_inode(int inode_idx);
