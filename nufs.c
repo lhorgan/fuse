@@ -55,6 +55,7 @@ nufs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
     get_stat("/hello.txt", &st);
     filler(buf, "hello.txt", &st, 0);*/
+    return read_dir(path, buf, filler, offset);
 
     return 0;
 }

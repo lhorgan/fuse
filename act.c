@@ -11,6 +11,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <fuse.h>
+
+int read_dir(const char* path, void* buf, fuse_fill_dir_t filler, off_t offset);
 
 #define DIRSIZE 20
 #define FPTLEN 40
@@ -309,6 +312,20 @@ int min(int num1, int num2) {
 //         entries[i].inode_idx = -1;
 //     }
 // }
+
+int read_dir(const char* path, void* buf, fuse_fill_dir_t filler, off_t offset) {
+    inode* dir_inode = get_inode_from_path(path);
+    if(dir_inode) {
+        directory_entry* dir = get_directory(dir_inode->dir_pnum);
+        for(int i = offset; i < DIRSIZE; i++) {
+            if(dir[i].inode_idx != -1) {
+                filler(buf, dir[i].name, 0, i + 1);
+            }
+        }
+        return 0;
+    }
+    return -1;
+}
 
 char* level_up(const char* path) {
     int last_slash_index = 0;
