@@ -12,6 +12,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <fuse.h>
+#include <stdlib.h>
 
 int read_dir(const char* path, void* buf, fuse_fill_dir_t filler, off_t offset);
 

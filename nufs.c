@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <bsd/string.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #define FUSE_USE_VERSION 26
 #include <fuse.h>
@@ -133,7 +134,7 @@ int
 nufs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     printf("read(%s, %ld bytes, @%ld)\n", path, size, offset);
-    const char* data = malloc(size); //=
+    char* data = malloc(size); //=
     int res = get_data(path, size, offset, data);
     if(res >= 0) {
         memcpy(buf, data, res); // originally strlcpy
