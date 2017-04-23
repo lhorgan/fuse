@@ -113,7 +113,8 @@ int
 nufs_truncate(const char *path, off_t size)
 {
     printf("truncate(%s, %ld bytes)\n", path, size);
-    return -1;
+    return truncate(path, size);
+    //return -1;
 }
 
 // this is called on open, but doesn't need to do much
@@ -147,7 +148,8 @@ int
 nufs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     printf("write(%s, %ld bytes, @%ld)\n", path, size, offset);
-    return -1;
+    return write_file(path, buf, size, offset);
+    //return -1;
 }
 
 void

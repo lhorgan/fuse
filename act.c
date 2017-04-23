@@ -243,8 +243,20 @@ void initialize_file_page_table(int pnum) {
     }
 }
 
+int truncate(const char* path, off_t size) {
+    inode* file_inode = get_inode_from_path(path);
+    if(file_inode && file_inode->data_pnum >= 0) {
+        printf("truncating successful!\n");
+        file_inode->size = size;
+        return 0;
+    }
+    printf("truncate failed!\n");
+    return -1;
+}
+
 int write_file(const char* path, const char* buf, size_t size, off_t offset) {
     inode* file_inode = get_inode_from_path(path);
+    printf("writing data to file!\n");
     if(file_inode && file_inode->data_pnum >= 0) {
         file_inode->size += size;
         int* page_nums = (int*)pages_get_page(file_inode->data_pnum);
@@ -254,6 +266,7 @@ int write_file(const char* path, const char* buf, size_t size, off_t offset) {
 
         data_remaining = size;
         while(data_remaining) {
+            printf("data remaining: %i\n", data_remaining);
             int page_num = page_nums[page_nums_index];
             if(page_num < 0) { // this page isn't pointing to anything yet
                 page_num = pages_find_empty(); // TODO: HANDLE PAGE NOT BEING FREE
@@ -273,9 +286,10 @@ int write_file(const char* path, const char* buf, size_t size, off_t offset) {
             }
             page_num++;
         }
-        return 0; // success
+        printf("WRITE SUCCESSFUL!\n");
+        return size; // success
     }
-
+    printf("someting went wrong\n");
     return -1; // error
 }
 

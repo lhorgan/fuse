@@ -59,3 +59,4 @@ int initialize_file(int pnum);
 int write_file(const char* path, const char* buf, size_t size, off_t offset);
 int min(int num1, int num2);
 void initialize_file_page_table(int pnum);
+int truncate(const char* path, off_t size);
