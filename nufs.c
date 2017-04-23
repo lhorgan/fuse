@@ -133,15 +133,12 @@ int
 nufs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     printf("read(%s, %ld bytes, @%ld)\n", path, size, offset);
-    const char* data = get_data(path);
-
-    int len = strlen(data) + 1;
-    if (size < len) {
-        len = size;
+    const char* data = malloc(size); //=
+    int res = get_data(path, size, offset, data);
+    if(res >= 0) {
+        memcpy(buf, data, res); // originally strlcpy
     }
-
-    memcpy(buf, data, len); // originally strlcpy
-    return len;
+    return res;
 }
 
 // Actually write data

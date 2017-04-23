@@ -42,7 +42,7 @@ struct inode {
 
 void storage_init(const char* path);
 int get_stat(const char* path, struct stat* st);
-const char* get_data(const char* path);
+int get_data(const char* path, size_t size, off_t offset, char* res);
 void pages_init(const char* path);
 void pages_free();
 void* pages_get_page(int pnum);

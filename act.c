@@ -49,16 +49,61 @@ int get_stat(const char* path, struct stat* st)
     return 0;
 }
 
-const char* get_data(const char* path)
-{
-    /*file_data* dat = get_file_data(path);
-    if (!dat) {
-        return 0;
-    }
+// const char* get_data(const char* path, size_t size, off_t offset)
+// {
+//     /*file_data* dat = get_file_data(path);
+//     if (!dat) {
+//         return 0;
+//     }
+//
+//     return dat->data;*/
+//     //printf("HIYA getting file data\n");
+//     inode* file_inode = get_inode_from_path(path);
+//     if(file_inode && file_inode->data_pnum >= 0) {
+//         int data_remaining = size;
+//         while(data_remaining > 0) {
+//
+//         }
+//     }
+//
+//     return "hello";
+// }
 
-    return dat->data;*/
-    //printf("HIYA getting file data\n");
-    return "hello";
+int get_data(const char* path, size_t size, off_t offset, char* res) {
+    inode* file_inode = get_inode_from_path(path);
+    printf("reading data from file!\n");
+    //res = (char*)malloc(size);
+    if(file_inode && file_inode->data_pnum >= 0) {
+        int* page_nums = (int*)pages_get_page(file_inode->data_pnum);
+        int page_nums_index = offset / 4096;
+        int data_remaining = size;
+        int off_in_page = offset - (4096 * page_nums_index);
+
+        while(data_remaining) {
+            printf("data remaining: %i\n", data_remaining);
+            int page_num = page_nums[page_nums_index];
+            if(page_num < 0) { // this page isn't pointing to anything yet
+                printf("page does not exist :(\n");
+                return -1;
+            }
+            char* data = (char*)(pages_get_page(page_num) + off_in_page);
+            strncpy(res, data, min(data_remaining, 4096 - off_in_page));
+            if(off_in_page + data_remaining > 4096) {
+                ////printf("writing starts at %i and I have %i characters to write\n", off_in_page, data_remaining);
+                data_remaining -= 4096 - off_in_page;
+                res += 4096 - off_in_page;
+                off_in_page = 0;
+            }
+            else {
+                data_remaining -= data_remaining;
+            }
+            page_num++;
+        }
+        printf("READ SUCCESSFUL!\n");
+        return size; // success
+    }
+    printf("someting went wrong\n");
+    return -1; // error
 }
 
 void pages_init(const char* path)
