@@ -1,4 +1,4 @@
-
+# provided as part of the project
 SRCS := $(wildcard *.c)
 OBJS := $(SRCS:.c=.o)
 HDRS := $(wildcard *.h)
